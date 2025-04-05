@@ -13,8 +13,7 @@ public:
 
     bool download(const std::string &name, const std::string &guid, uint32_t age);
 
-    std::filesystem::path
-    get_path(const std::string &name, const std::string &guid, uint32_t age);
+    std::filesystem::path get_path(const std::string &name, const std::string &guid, uint32_t age);
 
 private:
     bool valid_;
@@ -23,8 +22,7 @@ private:
     std::pair<std::string, std::string> server_split_;
     std::mutex mutex_;
 
-    static std::string
-    get_relative_path_str(const std::string &name, const std::string &guid, uint32_t age);
+    static std::string get_relative_path_str(const std::string &name, const std::string &guid, uint32_t age);
 
     bool download_impl(const std::string &relative_path);
 

@@ -1,34 +1,47 @@
-cmake_policy(SET CMP0135 NEW)
+find_package(GTest)
 
-include(FetchContent)
-include(GoogleTest)
+if(GTest_FOUND)
+    if(NOT TARGET GTest::gtest_main AND TARGET GTest::Main)
+        # CMake <3.20
+        add_library(GTest::gtest_main INTERFACE IMPORTED)
+        target_link_libraries(GTest::gtest_main INTERFACE GTest::Main)
+    endif()
+else()
+    if(POLICY CMP0135)
+        cmake_policy(SET CMP0135 NEW)
+    endif()
 
-set(BUILD_GMOCK OFF)
-set(INSTALL_GTEST OFF)
-set(gtest_force_shared_crt ON)
+    include(FetchContent)
 
-FetchContent_Declare(
-    gtest
-    URL https://github.com/google/googletest/archive/main.tar.gz
-)
-FetchContent_MakeAvailable(gtest)
+    set(BUILD_GMOCK OFF)
+    set(INSTALL_GTEST OFF)
+    set(gtest_force_shared_crt ON)
 
-add_executable(httplib-test test.cc)
-target_compile_options(httplib-test PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
-target_link_libraries(httplib-test PRIVATE httplib GTest::gtest_main)
+    FetchContent_Declare(
+        gtest
+        URL https://github.com/google/googletest/archive/main.tar.gz
+    )
+    FetchContent_MakeAvailable(gtest)
+endif()
+
+find_package(CURL REQUIRED)
+
+add_executable(httplib-test test.cc include_httplib.cc $<$<BOOL:${WIN32}>:include_windows_h.cc>)
+target_compile_options(httplib-test PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/utf-8;/bigobj>")
+target_link_libraries(httplib-test PRIVATE httplib GTest::gtest_main CURL::libcurl)
 gtest_discover_tests(httplib-test)
 
-execute_process(
-    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_LIST_DIR}/www www
-    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_LIST_DIR}/www2 www2
-    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_LIST_DIR}/www3 www3
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_LIST_DIR}/ca-bundle.crt ca-bundle.crt
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_LIST_DIR}/image.jpg image.jpg
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    COMMAND_ERROR_IS_FATAL ANY
+file(
+    COPY www www2 www3 ca-bundle.crt image.jpg
+    DESTINATION ${CMAKE_CURRENT_BINARY_DIR}
 )
 
 if(HTTPLIB_IS_USING_OPENSSL)
+    if (OPENSSL_VERSION VERSION_LESS "3.2.0")
+      set(OPENSSL_X509_FLAG "-x509")
+    else()
+      set(OPENSSL_X509_FLAG "-x509v1")
+    endif()
     find_program(OPENSSL_COMMAND
         NAMES openssl
         PATHS ${OPENSSL_INCLUDE_DIR}/../bin
@@ -48,7 +61,7 @@ if(HTTPLIB_IS_USING_OPENSSL)
         COMMAND_ERROR_IS_FATAL ANY
     )
     execute_process(
-        COMMAND ${OPENSSL_COMMAND} req -x509 -new -config ${CMAKE_CURRENT_LIST_DIR}/test.conf -key key.pem -sha256 -days 3650 -nodes -out cert2.pem -extensions SAN
+        COMMAND ${OPENSSL_COMMAND} req ${OPENSSL_X509_FLAG} -new -config ${CMAKE_CURRENT_LIST_DIR}/test.conf -key key.pem -sha256 -days 3650 -nodes -out cert2.pem -extensions SAN
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
         COMMAND_ERROR_IS_FATAL ANY
     )
@@ -59,7 +72,7 @@ if(HTTPLIB_IS_USING_OPENSSL)
         COMMAND_ERROR_IS_FATAL ANY
     )
     execute_process(
-        COMMAND ${OPENSSL_COMMAND} req -x509 -new -batch -config ${CMAKE_CURRENT_LIST_DIR}/test.rootCA.conf -key rootCA.key.pem -days 1024
+        COMMAND ${OPENSSL_COMMAND} req ${OPENSSL_X509_FLAG} -new -batch -config ${CMAKE_CURRENT_LIST_DIR}/test.rootCA.conf -key rootCA.key.pem -days 1024
         OUTPUT_FILE rootCA.cert.pem
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
         COMMAND_ERROR_IS_FATAL ANY
@@ -90,4 +103,19 @@ if(HTTPLIB_IS_USING_OPENSSL)
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
         COMMAND_ERROR_IS_FATAL ANY
     )
+    execute_process(
+        COMMAND ${OPENSSL_COMMAND} genrsa -aes256 -passout pass:test012! 2048
+        OUTPUT_FILE client_encrypted.key.pem
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        COMMAND_ERROR_IS_FATAL ANY
+    )
+    execute_process(
+        COMMAND ${OPENSSL_COMMAND} req -new -batch -config ${CMAKE_CURRENT_LIST_DIR}/test.conf -key client_encrypted.key.pem -passin pass:test012!
+        COMMAND ${OPENSSL_COMMAND} x509 -days 370 -req -CA rootCA.cert.pem -CAkey rootCA.key.pem -CAcreateserial
+        OUTPUT_FILE client_encrypted.cert.pem
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        COMMAND_ERROR_IS_FATAL ANY
+    )
 endif()
+
+add_subdirectory(fuzzing)

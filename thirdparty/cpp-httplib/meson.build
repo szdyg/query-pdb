@@ -13,7 +13,7 @@ project(
     'b_lto=true',
     'warning_level=3'
   ],
-  meson_version: '>=0.47.0'
+  meson_version: '>=0.62.0'
 )
 
 # Check just in case downstream decides to edit the source
@@ -30,10 +30,17 @@ endif
 deps = [dependency('threads')]
 args = []
 
-openssl_dep = dependency('openssl', version: '>=1.1.1', required: get_option('cpp-httplib_openssl'))
+openssl_dep = dependency('openssl', version: '>=3.0.0', required: get_option('cpp-httplib_openssl'))
 if openssl_dep.found()
   deps += openssl_dep
   args += '-DCPPHTTPLIB_OPENSSL_SUPPORT'
+  if host_machine.system() == 'darwin'
+    macosx_keychain_dep = dependency('appleframeworks', modules: ['CoreFoundation', 'Security'], required: get_option('cpp-httplib_macosx_keychain'))
+    if macosx_keychain_dep.found()
+        deps += macosx_keychain_dep
+        args += '-DCPPHTTPLIB_USE_CERTS_FROM_MACOSX_KEYCHAIN'
+    endif  
+  endif
 endif
 
 zlib_dep = dependency('zlib', required: get_option('cpp-httplib_zlib'))
@@ -91,20 +98,18 @@ if get_option('cpp-httplib_compile')
   )
 else
   install_headers('httplib.h')
-  cpp_httplib_dep = declare_dependency(compile_args: args, dependencies: deps, include_directories: include_directories('.'))
+  cpp_httplib_dep = declare_dependency(compile_args: args, dependencies: deps, include_directories: '.')
 
   import('pkgconfig').generate(
     name: 'cpp-httplib',
     description: 'A C++ HTTP/HTTPS server and client library',
-    install_dir: join_paths(get_option('datadir'), 'pkgconfig'),
+    install_dir: get_option('datadir')/'pkgconfig',
     url: 'https://github.com/yhirose/cpp-httplib',
     version: version
   )
 endif
 
-if meson.version().version_compare('>=0.54.0')
-  meson.override_dependency('cpp-httplib', cpp_httplib_dep)
-endif
+meson.override_dependency('cpp-httplib', cpp_httplib_dep)
 
 if get_option('cpp-httplib_test')
   subdir('test')

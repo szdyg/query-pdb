@@ -5,12 +5,11 @@
 using namespace std;
 using namespace httplib;
 
-template <typename T>
-void ProxyTest(T& cli, bool basic) {
+template <typename T> void ProxyTest(T &cli, bool basic) {
   cli.set_proxy("localhost", basic ? 3128 : 3129);
   auto res = cli.Get("/httpbin/get");
   ASSERT_TRUE(res != nullptr);
-  EXPECT_EQ(407, res->status);
+  EXPECT_EQ(StatusCode::ProxyAuthenticationRequired_407, res->status);
 }
 
 TEST(ProxyTest, NoSSLBasic) {
@@ -38,7 +37,7 @@ TEST(ProxyTest, SSLDigest) {
 // ----------------------------------------------------------------------------
 
 template <typename T>
-void RedirectProxyText(T& cli, const char *path, bool basic) {
+void RedirectProxyText(T &cli, const char *path, bool basic) {
   cli.set_proxy("localhost", basic ? 3128 : 3129);
   if (basic) {
     cli.set_proxy_basic_auth("hello", "world");
@@ -51,7 +50,7 @@ void RedirectProxyText(T& cli, const char *path, bool basic) {
 
   auto res = cli.Get(path);
   ASSERT_TRUE(res != nullptr);
-  EXPECT_EQ(200, res->status);
+  EXPECT_EQ(StatusCode::OK_200, res->status);
 }
 
 TEST(RedirectTest, HTTPBinNoSSLBasic) {
@@ -100,46 +99,46 @@ TEST(RedirectTest, YouTubeSSLDigest) {
 
 // ----------------------------------------------------------------------------
 
-template <typename T>
-void BaseAuthTestFromHTTPWatch(T& cli) {
+template <typename T> void BaseAuthTestFromHTTPWatch(T &cli) {
   cli.set_proxy("localhost", 3128);
   cli.set_proxy_basic_auth("hello", "world");
 
   {
     auto res = cli.Get("/basic-auth/hello/world");
     ASSERT_TRUE(res != nullptr);
-    EXPECT_EQ(401, res->status);
+    EXPECT_EQ(StatusCode::Unauthorized_401, res->status);
   }
 
   {
-    auto res =
-        cli.Get("/basic-auth/hello/world",
-                {make_basic_authentication_header("hello", "world")});
+    auto res = cli.Get("/basic-auth/hello/world",
+                       {make_basic_authentication_header("hello", "world")});
     ASSERT_TRUE(res != nullptr);
-    EXPECT_EQ("{\n  \"authenticated\": true, \n  \"user\": \"hello\"\n}\n", res->body);
-    EXPECT_EQ(200, res->status);
+    EXPECT_EQ("{\n  \"authenticated\": true, \n  \"user\": \"hello\"\n}\n",
+              res->body);
+    EXPECT_EQ(StatusCode::OK_200, res->status);
   }
 
   {
     cli.set_basic_auth("hello", "world");
     auto res = cli.Get("/basic-auth/hello/world");
     ASSERT_TRUE(res != nullptr);
-    EXPECT_EQ("{\n  \"authenticated\": true, \n  \"user\": \"hello\"\n}\n", res->body);
-    EXPECT_EQ(200, res->status);
+    EXPECT_EQ("{\n  \"authenticated\": true, \n  \"user\": \"hello\"\n}\n",
+              res->body);
+    EXPECT_EQ(StatusCode::OK_200, res->status);
   }
 
   {
     cli.set_basic_auth("hello", "bad");
     auto res = cli.Get("/basic-auth/hello/world");
     ASSERT_TRUE(res != nullptr);
-    EXPECT_EQ(401, res->status);
+    EXPECT_EQ(StatusCode::Unauthorized_401, res->status);
   }
 
   {
     cli.set_basic_auth("bad", "world");
     auto res = cli.Get("/basic-auth/hello/world");
     ASSERT_TRUE(res != nullptr);
-    EXPECT_EQ(401, res->status);
+    EXPECT_EQ(StatusCode::Unauthorized_401, res->status);
   }
 }
 
@@ -158,15 +157,14 @@ TEST(BaseAuthTest, SSL) {
 // ----------------------------------------------------------------------------
 
 #ifdef CPPHTTPLIB_OPENSSL_SUPPORT
-template <typename T>
-void DigestAuthTestFromHTTPWatch(T& cli) {
+template <typename T> void DigestAuthTestFromHTTPWatch(T &cli) {
   cli.set_proxy("localhost", 3129);
   cli.set_proxy_digest_auth("hello", "world");
 
   {
     auto res = cli.Get("/digest-auth/auth/hello/world");
     ASSERT_TRUE(res != nullptr);
-    EXPECT_EQ(401, res->status);
+    EXPECT_EQ(StatusCode::Unauthorized_401, res->status);
   }
 
   {
@@ -181,24 +179,25 @@ void DigestAuthTestFromHTTPWatch(T& cli) {
     for (auto path : paths) {
       auto res = cli.Get(path.c_str());
       ASSERT_TRUE(res != nullptr);
-      EXPECT_EQ("{\n  \"authenticated\": true, \n  \"user\": \"hello\"\n}\n", res->body);
-      EXPECT_EQ(200, res->status);
+      EXPECT_EQ("{\n  \"authenticated\": true, \n  \"user\": \"hello\"\n}\n",
+                res->body);
+      EXPECT_EQ(StatusCode::OK_200, res->status);
     }
 
     cli.set_digest_auth("hello", "bad");
     for (auto path : paths) {
       auto res = cli.Get(path.c_str());
       ASSERT_TRUE(res != nullptr);
-      EXPECT_EQ(401, res->status);
+      EXPECT_EQ(StatusCode::Unauthorized_401, res->status);
     }
 
     // NOTE: Until httpbin.org fixes issue #46, the following test is commented
-    // out. Plese see https://httpbin.org/digest-auth/auth/hello/world
+    // out. Please see https://httpbin.org/digest-auth/auth/hello/world
     // cli.set_digest_auth("bad", "world");
     // for (auto path : paths) {
     //   auto res = cli.Get(path.c_str());
     //   ASSERT_TRUE(res != nullptr);
-    //   EXPECT_EQ(401, res->status);
+    //   EXPECT_EQ(StatusCode::Unauthorized_401, res->status);
     // }
   }
 }
@@ -216,8 +215,7 @@ TEST(DigestAuthTest, NoSSL) {
 
 // ----------------------------------------------------------------------------
 
-template <typename T>
-void KeepAliveTest(T& cli, bool basic) {
+template <typename T> void KeepAliveTest(T &cli, bool basic) {
   cli.set_proxy("localhost", basic ? 3128 : 3129);
   if (basic) {
     cli.set_proxy_basic_auth("hello", "world");
@@ -234,11 +232,11 @@ void KeepAliveTest(T& cli, bool basic) {
 
   {
     auto res = cli.Get("/httpbin/get");
-    EXPECT_EQ(200, res->status);
+    EXPECT_EQ(StatusCode::OK_200, res->status);
   }
   {
     auto res = cli.Get("/httpbin/redirect/2");
-    EXPECT_EQ(200, res->status);
+    EXPECT_EQ(StatusCode::OK_200, res->status);
   }
 
   {
@@ -249,10 +247,11 @@ void KeepAliveTest(T& cli, bool basic) {
         "/httpbin/digest-auth/auth-int/hello/world/MD5",
     };
 
-    for (auto path: paths) {
+    for (auto path : paths) {
       auto res = cli.Get(path.c_str());
-      EXPECT_EQ("{\n  \"authenticated\": true, \n  \"user\": \"hello\"\n}\n", res->body);
-      EXPECT_EQ(200, res->status);
+      EXPECT_EQ("{\n  \"authenticated\": true, \n  \"user\": \"hello\"\n}\n",
+                res->body);
+      EXPECT_EQ(StatusCode::OK_200, res->status);
     }
   }
 
@@ -260,7 +259,7 @@ void KeepAliveTest(T& cli, bool basic) {
     int count = 10;
     while (count--) {
       auto res = cli.Get("/httpbin/get");
-      EXPECT_EQ(200, res->status);
+      EXPECT_EQ(StatusCode::OK_200, res->status);
     }
   }
 }

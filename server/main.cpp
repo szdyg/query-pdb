@@ -15,8 +15,7 @@ int main(int argc, char *argv[]) {
             ("ip", "ip address", cxxopts::value<std::string>()->default_value("0.0.0.0"))
             ("port", "port", cxxopts::value<uint16_t>()->default_value("8080"))
             ("path", "download path", cxxopts::value<std::string>()->default_value("save"))
-            ("server", "download server", cxxopts::value<std::string>()->default_value(
-                    "https://msdl.microsoft.com/download/symbols/"))
+            ("server", "download server", cxxopts::value<std::string>()->default_value("https://msdl.microsoft.com/download/symbols/"))
             ("log", "write log to file", cxxopts::value<bool>()->default_value("false"))
             ("h,help", "print help");
 
@@ -76,7 +75,7 @@ int main(int argc, char *argv[]) {
         auto name = body["name"].get<std::string>();
         auto guid = body["guid"].get<std::string>();
         auto age = body["age"].get<uint32_t>();
-        auto query = body["query"].get<std::set<std::string>>();
+        auto query = body["query"].get<std::set<std::string> >();
 
         // download pdb
         if (!storage.download(name, guid, age)) {
@@ -107,7 +106,7 @@ int main(int argc, char *argv[]) {
         auto name = body["name"].get<std::string>();
         auto guid = body["guid"].get<std::string>();
         auto age = body["age"].get<uint32_t>();
-        auto query = body["query"].get<std::map<std::string, std::set<std::string>>>();
+        auto query = body["query"].get<std::map<std::string, std::set<std::string> > >();
 
         // download pdb
         if (!storage.download(name, guid, age)) {
@@ -116,10 +115,10 @@ int main(int argc, char *argv[]) {
 
         // parse pdb
         pdb_parser parser(storage.get_path(name, guid, age).string());
-        std::map<std::string, std::map<std::string, field_info>> result =
+        std::map<std::string, std::map<std::string, field_info> > result =
                 parser.get_struct(query);
 
-        std::map<std::string, std::map<std::string, std::map<std::string, int64_t>>> translate;
+        std::map<std::string, std::map<std::string, std::map<std::string, int64_t> > > translate;
         for (const auto &[struct_name, fields]: result) {
             translate[struct_name] = {};
             for (const auto &[field_name, field]: fields) {
@@ -147,7 +146,7 @@ int main(int argc, char *argv[]) {
         auto name = body["name"].get<std::string>();
         auto guid = body["guid"].get<std::string>();
         auto age = body["age"].get<uint32_t>();
-        auto query = body["query"].get<std::map<std::string, std::set<std::string>>>();
+        auto query = body["query"].get<std::map<std::string, std::set<std::string> > >();
 
         // download pdb
         if (!storage.download(name, guid, age)) {
