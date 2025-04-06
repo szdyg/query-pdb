@@ -1,6 +1,6 @@
 FROM ubuntu:22.04
 
-MAINTAINER zouxianyu "2979121738@qq.com"
+MAINTAINER szdyg "szddyg@outlook.com"
 
 RUN apt-get update
 

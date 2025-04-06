@@ -20,77 +20,11 @@ target_include_directories(
 )
 
 # find openssl library
-# on Windows, we use the prebuilt library
 # on Linux, we use the library installed by system package manager
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    message("Windows")
-    if (CMAKE_SIZEOF_VOID_P EQUAL 8)
-        add_library(OpenSSL::SSL SHARED IMPORTED)
-        set_target_properties(
-                OpenSSL::SSL
-                PROPERTIES
-                IMPORTED_IMPLIB ${CMAKE_SOURCE_DIR}/thirdparty/openssl/x64/lib/libssl.lib
-        )
-        add_library(OpenSSL::Crypto SHARED IMPORTED)
-        set_target_properties(
-                OpenSSL::Crypto
-                PROPERTIES
-                IMPORTED_IMPLIB ${CMAKE_SOURCE_DIR}/thirdparty/openssl/x64/lib/libcrypto.lib
-        )
-        add_custom_command(
-                TARGET query_pdb_server
-                POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                ${CMAKE_SOURCE_DIR}/thirdparty/openssl/x64/bin/libcrypto-1_1-x64.dll
-                ${CMAKE_BINARY_DIR}/server
-        )
-        add_custom_command(
-                TARGET query_pdb_server
-                POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                ${CMAKE_SOURCE_DIR}/thirdparty/openssl/x64/bin/libssl-1_1-x64.dll
-                ${CMAKE_BINARY_DIR}/server
-        )
-        target_include_directories(
-                query_pdb_server
-                PRIVATE
-                ${CMAKE_SOURCE_DIR}/thirdparty/openssl/x64/include
-        )
-    else ()
-        add_library(OpenSSL::SSL SHARED IMPORTED)
-        set_target_properties(
-                OpenSSL::SSL
-                PROPERTIES
-                IMPORTED_IMPLIB ${CMAKE_SOURCE_DIR}/thirdparty/openssl/x86/lib/libssl.lib
-        )
-        add_library(OpenSSL::Crypto SHARED IMPORTED)
-        set_target_properties(
-                OpenSSL::Crypto
-                PROPERTIES
-                IMPORTED_IMPLIB ${CMAKE_SOURCE_DIR}/thirdparty/openssl/x86/lib/libcrypto.lib
-        )
-        add_custom_command(
-                TARGET query_pdb_server
-                POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                ${CMAKE_SOURCE_DIR}/thirdparty/openssl/x86/bin/libcrypto-1_1.dll
-                ${CMAKE_BINARY_DIR}/server
-        )
-        add_custom_command(
-                TARGET query_pdb_server
-                POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                ${CMAKE_SOURCE_DIR}/thirdparty/openssl/x86/bin/libssl-1_1.dll
-                ${CMAKE_BINARY_DIR}/server
-        )
-        target_include_directories(
-                query_pdb_server
-                PRIVATE
-                ${CMAKE_SOURCE_DIR}/thirdparty/openssl/x86/include
-        )
-    endif ()
+    message(FATAL_ERROR "No longer supports Windows")
 else ()
-    find_package(OpenSSL 1.1.1 REQUIRED)
+    find_package(OpenSSL 3.0.0 REQUIRED)
 endif ()
 
 target_link_libraries(

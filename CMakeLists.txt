@@ -7,5 +7,5 @@ add_subdirectory(thirdparty/nlohmann_json)
 add_subdirectory(thirdparty/raw_pdb)
 add_subdirectory(thirdparty/spdlog)
 
-add_subdirectory(client)
+
 add_subdirectory(server)

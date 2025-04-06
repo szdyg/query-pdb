@@ -9,13 +9,27 @@
 #include "downloader.h"
 #include "pdb_parser.h"
 
+
+
+
+std::set<std::string> split(const std::string& s, char delimiter) {
+    std::set<std::string> tokens;
+    std::string token;
+    std::istringstream token_stream(s);
+    while (std::getline(token_stream, token, delimiter)) {
+        tokens.insert(token);
+    }
+    return tokens;
+}
+
 int main(int argc, char *argv[]) {
     cxxopts::Options option_parser("query-pdb", "pdb query server");
     option_parser.add_options()
             ("ip", "ip address", cxxopts::value<std::string>()->default_value("0.0.0.0"))
             ("port", "port", cxxopts::value<uint16_t>()->default_value("8080"))
             ("path", "download path", cxxopts::value<std::string>()->default_value("save"))
-            ("server", "download server", cxxopts::value<std::string>()->default_value("https://msdl.microsoft.com/download/symbols/"))
+            ("server", "download server",
+             cxxopts::value<std::string>()->default_value("https://msdl.microsoft.com/download/symbols/"))
             ("log", "write log to file", cxxopts::value<bool>()->default_value("false"))
             ("h,help", "print help");
 
@@ -37,10 +51,6 @@ int main(int argc, char *argv[]) {
     }
 
     downloader storage(download_path, download_server);
-    if (!storage.valid()) {
-        spdlog::error("exit due to downloader invalid");
-        return 1;
-    }
 
     httplib::Server server;
     server.set_exception_handler([](const auto &req, auto &res, std::exception_ptr ep) {
@@ -58,48 +68,37 @@ int main(int argc, char *argv[]) {
         spdlog::error("exception: {}", content);
     });
 
-    // example:
-    // {
-    //     "name": "ntdll.pdb",
-    //     "guid": "ABCDEF...",
-    //     "age": 1
-    //     "query": [
-    //         "Name1",
-    //         "Name2",
-    //         ...
-    //     ]
-    // }
-    server.Post("/symbol", [&storage](const httplib::Request &req, httplib::Response &res) {
+
+    server.Get("/symbol", [&storage](const httplib::Request &req, httplib::Response &res) {
         spdlog::info("symbol request: {}", req.body);
-        auto body = nlohmann::json::parse(req.body);
-        auto name = body["name"].get<std::string>();
-        auto guid = body["guid"].get<std::string>();
-        auto age = body["age"].get<uint32_t>();
-        auto query = body["query"].get<std::set<std::string> >();
+
+        if (!req.has_param("pdb_name") ||
+            !req.has_param("guid") ||
+            !req.has_param("query") ||
+            !req.has_param("age")) {
+            res.status = 400;
+            res.set_content("invaild params", "plain/text");
+            return;
+        }
+        auto query = req.get_param_value("query");
+        auto pdb_name = req.get_param_value("pdb_name");
+        auto guid = req.get_param_value("guid");
+        auto age = std::stoul(req.get_param_value("age"));
+
+        auto query_data = split(query, ',');
 
         // download pdb
-        if (!storage.download(name, guid, age)) {
+        if (!storage.download(pdb_name, guid, age)) {
             throw std::runtime_error("download failed");
         }
 
         // parse pdb
-        pdb_parser parser(storage.get_path(name, guid, age).string());
-        nlohmann::json result = parser.get_symbols(query);
+        pdb_parser parser(storage.get_path(pdb_name, guid, age).string());
+        nlohmann::json result = parser.get_symbols(query_data);
 
         res.set_content(result.dump(), "application/json");
     });
 
-    // example:
-    // {
-    //     "name": "ntdll.pdb",
-    //     "guid": "ABCDEF...",
-    //     "age": 1
-    //     "query": {
-    //         "struct1": {"field1", "field2", "field3"},
-    //         "struct2": {"field4", "field5", "field6"},
-    //         ...
-    //     }
-    // }
     server.Post("/struct", [&storage](const httplib::Request &req, httplib::Response &res) {
         spdlog::info("struct request: {}", req.body);
         auto body = nlohmann::json::parse(req.body);
@@ -129,17 +128,7 @@ int main(int argc, char *argv[]) {
         res.set_content(nlohmann::json(translate).dump(), "application/json");
     });
 
-    // example:
-    // {
-    //     "name": "ntdll.pdb",
-    //     "guid": "ABCDEF...",
-    //     "age": 1
-    //     "query": {
-    //         "enum1": {"name1", "name2", "name3"},
-    //         "enum2": {"name4", "name5", "name6"},
-    //         ...
-    //     }
-    // }
+
     server.Post("/enum", [&storage](const httplib::Request &req, httplib::Response &res) {
         spdlog::info("enum request: {}", req.body);
         auto body = nlohmann::json::parse(req.body);
