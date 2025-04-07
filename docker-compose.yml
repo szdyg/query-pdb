@@ -4,6 +4,7 @@ services:
   query-pdb:
     container_name: query-pdb
     image: szdyg/query-pdb:latest
+    restart: always
     environment:
       - MSDL_DOWNLOAD_SERVER="https://msdl.microsoft.com/download/symbols"
       - QUERY_PDB_SAVE_PATH="/pdb"
