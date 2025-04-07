@@ -10,12 +10,12 @@ std::map<std::string, int64_t> pdb_parser::get_symbols(const std::set<std::strin
 }
 
 std::map<std::string, std::map<std::string, field_info>>
-pdb_parser::get_struct(const std::map<std::string, std::set<std::string>> &names) const {
+pdb_parser::get_struct(const std::set<std::string> &names) const {
     return call_with_pdb_stream(get_struct_impl, names);
 }
 
 std::map<std::string, std::map<std::string, int64_t>>
-pdb_parser::get_enum(const std::map<std::string, std::set<std::string>> &names) const {
+pdb_parser::get_enum(const std::set<std::string> &names) const {
     return call_with_pdb_stream(get_enum_impl, names);
 }
 
@@ -213,12 +213,10 @@ pdb_parser::get_symbols_impl(
 }
 
 std::map<std::string, std::map<std::string, field_info>>
-pdb_parser::get_struct_impl(
-        const PDB::RawFile &raw_file,
+pdb_parser::get_struct_impl(const PDB::RawFile &raw_file,
         const PDB::DBIStream &dbi_stream,
         const PDB::TPIStream &tpi_stream,
-        const std::map<std::string, std::set<std::string>> &names
-) {
+        const std::set<std::string> &names) {
     std::map<std::string, std::map<std::string, field_info>> result;
 
     for (const auto &record: tpi_stream.GetTypeRecords()) {
@@ -235,8 +233,8 @@ pdb_parser::get_struct_impl(
 
             if (auto it = names.find(leaf_name); it != names.end()) {
                 std::map<std::string, field_info> fields =
-                        get_struct_single(tpi_stream, type_record, it->second);
-                result.insert({it->first, fields});
+                        get_struct_single(tpi_stream, type_record);
+                result.insert({leaf_name, fields});
             }
         } else if (record->header.kind == PDB::CodeView::TPI::TypeRecordKind::LF_UNION) {
             if (record->data.LF_UNION.property.fwdref)
@@ -251,30 +249,19 @@ pdb_parser::get_struct_impl(
 
             if (auto it = names.find(leaf_name); it != names.end()) {
                 std::map<std::string, field_info> fields =
-                        get_struct_single(tpi_stream, type_record, it->second);
-                result.insert({it->first, fields});
+                        get_struct_single(tpi_stream, type_record);
+                result.insert({leaf_name, fields});
             }
         }
     }
 
-    for (const auto &[name, fields]: names) {
-        if (result.find(name) == result.end()) {
-            std::map<std::string, field_info> empty_fields;
-            for (const auto &field: fields) {
-                empty_fields.insert({field, {}});
-            }
-
-            result.insert({name, empty_fields});
-        }
-    }
     return result;
 }
 
 std::map<std::string, field_info>
 pdb_parser::get_struct_single(
         const PDB::TPIStream &tpi_stream,
-        const PDB::CodeView::TPI::Record *record,
-        const std::set<std::string> &names
+        const PDB::CodeView::TPI::Record *record
 ) {
     std::map<std::string, field_info> result;
 
@@ -320,7 +307,7 @@ pdb_parser::get_struct_single(
                                     pointer_level, &referenced_type,
                                     &modifier_record);
 
-            if (names.find(leaf_name) != names.end()) {
+
                 field_info info{};
                 info.offset = offset;
                 if (referenced_type &&
@@ -329,7 +316,7 @@ pdb_parser::get_struct_single(
                     info.bitfield_offset = referenced_type->data.LF_BITFIELD.position;
                 }
                 result.insert({leaf_name, info});
-            }
+
         } else if (field_record->kind == PDB::CodeView::TPI::TypeRecordKind::LF_NESTTYPE) {
             leaf_name = &field_record->data.LF_NESTTYPE.name[0];
         } else if (field_record->kind == PDB::CodeView::TPI::TypeRecordKind::LF_STMEMBER) {
@@ -358,12 +345,6 @@ pdb_parser::get_struct_single(
         i = (i + (sizeof(uint32_t) - 1)) & (0 - sizeof(uint32_t));
     }
 
-    for (const std::string &name: names) {
-        if (result.find(name) == result.end()) {
-            result.insert({name, {}});
-        }
-    }
-
     return result;
 }
 
@@ -372,7 +353,7 @@ pdb_parser::get_enum_impl(
         const PDB::RawFile &raw_file,
         const PDB::DBIStream &dbi_stream,
         const PDB::TPIStream &tpi_stream,
-        const std::map<std::string, std::set<std::string>> &names
+        const std::set<std::string> &names
 ) {
     std::map<std::string, std::map<std::string, int64_t>> result;
 
@@ -390,30 +371,19 @@ pdb_parser::get_enum_impl(
                 std::map<std::string, int64_t> fields =
                         get_enum_single(type_record, GetLeafSize(
                                 static_cast<PDB::CodeView::TPI::TypeRecordKind>(
-                                        record->data.LF_ENUM.utype)), it->second);
-                result.insert({it->first, fields});
+                                        record->data.LF_ENUM.utype)));
+                result.insert({leaf_name, fields});
             }
         }
     }
 
-    for (const auto &[name, fields]: names) {
-        if (result.find(name) == result.end()) {
-            std::map<std::string, int64_t> empty_fields;
-            for (const auto &field: fields) {
-                empty_fields.insert({field, -1});
-            }
-            result.insert({name, empty_fields});
-        }
-    }
     return result;
 }
 
 std::map<std::string, int64_t>
 pdb_parser::get_enum_single(
         const PDB::CodeView::TPI::Record *record,
-        uint8_t underlying_type_size,
-        const std::set<std::string> &names
-) {
+        uint8_t underlying_type_size) {
     std::map<std::string, int64_t> result;
 
     const char *leaf_name = nullptr;
@@ -457,9 +427,9 @@ pdb_parser::get_enum_single(
                 break;
         }
 
-        if (names.find(leaf_name) != names.end()) {
-            result.insert({leaf_name, value});
-        }
+
+        result.insert({leaf_name, value});
+
 
         i += static_cast<size_t>(leaf_name - reinterpret_cast<const char *>(field_record));
         i += strnlen(leaf_name, maximum_size - i - 1) + 1;
@@ -468,11 +438,6 @@ pdb_parser::get_enum_single(
         (void) value_ptr;
     }
 
-    for (const std::string &name: names) {
-        if (result.find(name) == result.end()) {
-            result.insert({name, -1});
-        }
-    }
 
     return result;
 }

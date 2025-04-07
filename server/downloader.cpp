@@ -26,9 +26,9 @@ downloader::downloader(std::string save_path, std::string msdl_server)
     }
 }
 
-bool downloader::download(const std::string &name, const std::string &guid, uint32_t age) {
-    std::string relative_path = get_relative_path_str(name, guid, age);
-    auto path = get_path(name, guid, age);
+bool downloader::download(const std::string &name, const std::string &guid) {
+    std::string relative_path = get_relative_path_str(name, guid);
+    auto path = get_path(name, guid);
     spdlog::trace("lookup pdb, path: {}", relative_path);
 
     if (download_cache(path.string())) {
@@ -39,26 +39,24 @@ bool downloader::download(const std::string &name, const std::string &guid, uint
     return download_impl(relative_path);
 }
 
-std::string downloader::get_relative_path_str(const std::string &name, const std::string &guid, uint32_t age) {
+std::string downloader::get_relative_path_str(const std::string &name, const std::string &guid) {
     std::stringstream ss;
     ss << std::hex << std::uppercase;
-    ss << name << '/' << guid << age << '/' << name;
+    ss << name << '/' << guid  << '/' << name;
     return ss.str();
 }
 
-std::filesystem::path downloader::get_path(const std::string &name, const std::string &guid, uint32_t age) {
-    std::string relative_path = get_relative_path_str(name, guid, age);
+std::filesystem::path downloader::get_path(const std::string &name, const std::string &guid) {
+    std::string relative_path = get_relative_path_str(name, guid);
     auto path = std::filesystem::path(save_path_).append(relative_path);
     return path;
 }
 
 bool downloader::download_impl(const std::string &relative_path) {
     spdlog::info("download pdb, path: {}", relative_path);
-
     std::unique_lock<std::shared_mutex> lck(mutex_);
     auto path = std::filesystem::path(save_path_).append(relative_path);
     std::filesystem::create_directories(path.parent_path());
-    std::string buf;
     httplib::Client client(server_split_.first);
     client.set_follow_location(true);
     auto res = client.Get(server_split_.second + relative_path);

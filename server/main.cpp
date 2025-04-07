@@ -1,8 +1,6 @@
 #include <utility>
 #include <set>
-#define CPPHTTPLIB_OPENSSL_SUPPORT
 #include <httplib.h>
-#include <cxxopts.hpp>
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/daily_file_sink.h>
@@ -23,32 +21,11 @@ std::set<std::string> split(const std::string& s, char delimiter) {
 }
 
 int main(int argc, char *argv[]) {
-    cxxopts::Options option_parser("query-pdb", "pdb query server");
-    option_parser.add_options()
-            ("ip", "ip address", cxxopts::value<std::string>()->default_value("0.0.0.0"))
-            ("port", "port", cxxopts::value<uint16_t>()->default_value("8080"))
-            ("path", "download path", cxxopts::value<std::string>()->default_value("save"))
-            ("server", "download server",
-             cxxopts::value<std::string>()->default_value("https://msdl.microsoft.com/download/symbols/"))
-            ("log", "write log to file", cxxopts::value<bool>()->default_value("false"))
-            ("h,help", "print help");
 
-    auto parse_result = option_parser.parse(argc, argv);
-
-    if (parse_result.count("help")) {
-        std::cout << option_parser.help() << std::endl;
-        return 0;
-    }
-
-    const auto ip = parse_result["ip"].as<std::string>();
-    const auto port = parse_result["port"].as<uint16_t>();
-    const auto download_path = parse_result["path"].as<std::string>();
-    const auto download_server = parse_result["server"].as<std::string>();
-    const auto log_to_file = parse_result["log"].as<bool>();
-
-    if (log_to_file) {
-        spdlog::set_default_logger(spdlog::daily_logger_mt("query-pdb", "server.log"));
-    }
+    std::string download_path  = getenv("QUERY_PDB_SAVE_PATH");
+    spdlog::info("pdb save path = {}", download_path);
+    std::string download_server  = getenv("MSDL_DOWNLOAD_SERVER");
+    spdlog::info("pdb server = {}", download_server);
 
     downloader storage(download_path, download_server);
 
@@ -68,54 +45,54 @@ int main(int argc, char *argv[]) {
         spdlog::error("exception: {}", content);
     });
 
-
     server.Get("/symbol", [&storage](const httplib::Request &req, httplib::Response &res) {
-        spdlog::info("symbol request: {}", req.body);
-
-        if (!req.has_param("pdb_name") ||
+        if (!req.has_param("pdb") ||
             !req.has_param("guid") ||
-            !req.has_param("query") ||
-            !req.has_param("age")) {
+            !req.has_param("query") ) {
             res.status = 400;
-            res.set_content("invaild params", "plain/text");
+            res.set_content("invaild params", "application/json");
             return;
         }
         auto query = req.get_param_value("query");
-        auto pdb_name = req.get_param_value("pdb_name");
+        auto pdb = req.get_param_value("pdb");
         auto guid = req.get_param_value("guid");
-        auto age = std::stoul(req.get_param_value("age"));
-
         auto query_data = split(query, ',');
 
         // download pdb
-        if (!storage.download(pdb_name, guid, age)) {
+        if (!storage.download(pdb, guid)) {
             throw std::runtime_error("download failed");
         }
 
         // parse pdb
-        pdb_parser parser(storage.get_path(pdb_name, guid, age).string());
+        pdb_parser parser(storage.get_path(pdb, guid).string());
         nlohmann::json result = parser.get_symbols(query_data);
 
         res.set_content(result.dump(), "application/json");
     });
 
-    server.Post("/struct", [&storage](const httplib::Request &req, httplib::Response &res) {
-        spdlog::info("struct request: {}", req.body);
-        auto body = nlohmann::json::parse(req.body);
-        auto name = body["name"].get<std::string>();
-        auto guid = body["guid"].get<std::string>();
-        auto age = body["age"].get<uint32_t>();
-        auto query = body["query"].get<std::map<std::string, std::set<std::string> > >();
+    server.Get("/struct", [&storage](const httplib::Request &req, httplib::Response &res) {
+        if (!req.has_param("pdb") ||
+            !req.has_param("guid") ||
+            !req.has_param("query")){
+            res.status = 400;
+            res.set_content("invaild params", "application/json");
+            return;
+        }
+
+        auto query = req.get_param_value("query");
+        auto pdb = req.get_param_value("pdb");
+        auto guid = req.get_param_value("guid");
+        auto query_data=  split(query, ',');
 
         // download pdb
-        if (!storage.download(name, guid, age)) {
+        if (!storage.download(pdb, guid)) {
             throw std::runtime_error("download failed");
         }
 
         // parse pdb
-        pdb_parser parser(storage.get_path(name, guid, age).string());
-        std::map<std::string, std::map<std::string, field_info> > result =
-                parser.get_struct(query);
+        pdb_parser parser(storage.get_path(pdb, guid).string());
+
+        std::map<std::string, std::map<std::string, field_info> > result =parser.get_struct(query_data);
 
         std::map<std::string, std::map<std::string, std::map<std::string, int64_t> > > translate;
         for (const auto &[struct_name, fields]: result) {
@@ -128,27 +105,34 @@ int main(int argc, char *argv[]) {
         res.set_content(nlohmann::json(translate).dump(), "application/json");
     });
 
+    server.Get("/enum", [&storage](const httplib::Request &req, httplib::Response &res) {
 
-    server.Post("/enum", [&storage](const httplib::Request &req, httplib::Response &res) {
-        spdlog::info("enum request: {}", req.body);
-        auto body = nlohmann::json::parse(req.body);
-        auto name = body["name"].get<std::string>();
-        auto guid = body["guid"].get<std::string>();
-        auto age = body["age"].get<uint32_t>();
-        auto query = body["query"].get<std::map<std::string, std::set<std::string> > >();
+        if (!req.has_param("pdb") ||
+            !req.has_param("guid") ||
+            !req.has_param("query")){
+            res.status = 400;
+            res.set_content("invaild params", "application/json");
+            return;
+        }
+
+        auto query = req.get_param_value("query");
+        auto pdb = req.get_param_value("pdb");
+        auto guid = req.get_param_value("guid");
+        auto query_data=  split(query, ',');
 
         // download pdb
-        if (!storage.download(name, guid, age)) {
+        if (!storage.download(pdb, guid)) {
             throw std::runtime_error("download failed");
         }
 
         // parse pdb
-        pdb_parser parser(storage.get_path(name, guid, age).string());
-        nlohmann::json result = parser.get_enum(query);
+        pdb_parser parser(storage.get_path(pdb, guid).string());
+        nlohmann::json result = parser.get_enum(query_data);
 
         res.set_content(result.dump(), "application/json");
     });
 
-    server.listen(ip, port);
+    server.listen("0.0.0.0", 8080);
+
     return 0;
 }

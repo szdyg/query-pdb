@@ -2,12 +2,14 @@ FROM ubuntu:22.04
 
 MAINTAINER szdyg "szddyg@outlook.com"
 
+ENV MSDL_DOWNLOAD_SERVER = "https://msdl.microsoft.com/download/symbols"
+ENV QUERY_PDB_SAVE_PATH = "/pdb"
+
 RUN apt-get update
 
 RUN apt-get install -y \
     build-essential \
     cmake \
-    supervisor \
     libssl-dev
 
 COPY . /query-pdb/
@@ -18,4 +20,4 @@ RUN cd /query-pdb && \
     cmake .. && \
     cmake --build . --target query_pdb_server
 
-ENTRYPOINT ["/usr/bin/supervisord", "-c", "/query-pdb/supervisord.conf"]
+ENTRYPOINT ["/query-pdb/build/server/query_pdb_server"]

@@ -30,13 +30,14 @@ class pdb_parser {
 public:
     explicit pdb_parser(const std::string &filename);
 
-    std::map<std::string, int64_t> get_symbols(const std::set<std::string> &names) const;
+    std::map<std::string, int64_t>
+    get_symbols(const std::set<std::string> &names) const;
 
     std::map<std::string, std::map<std::string, field_info>>
-    get_struct(const std::map<std::string, std::set<std::string>> &names) const;
+    get_struct(const std::set<std::string> &names) const;
 
     std::map<std::string, std::map<std::string, int64_t>>
-    get_enum(const std::map<std::string, std::set<std::string>> &names) const;
+    get_enum(const std::set<std::string> &names) const;
 
 private:
     handle_guard file_{};
@@ -53,14 +54,13 @@ private:
             const PDB::RawFile &raw_file,
             const PDB::DBIStream &dbi_stream,
             const PDB::TPIStream &tpi_stream,
-            const std::map<std::string, std::set<std::string>> &names
+            const std::set<std::string> &names
     );
 
     static std::map<std::string, field_info>
     get_struct_single(
             const PDB::TPIStream &tpi_stream,
-            const PDB::CodeView::TPI::Record *record,
-            const std::set<std::string> &names
+            const PDB::CodeView::TPI::Record *record
     );
 
     static std::map<std::string, std::map<std::string, int64_t>>
@@ -68,14 +68,13 @@ private:
             const PDB::RawFile &raw_file,
             const PDB::DBIStream &dbi_stream,
             const PDB::TPIStream &tpi_stream,
-            const std::map<std::string, std::set<std::string>> &names
+            const std::set<std::string> &names
     );
 
     static std::map<std::string, int64_t>
     get_enum_single(
             const PDB::CodeView::TPI::Record *record,
-            uint8_t underlying_type_size,
-            const std::set<std::string> &names
+            uint8_t underlying_type_size
     );
 
     template<typename F, typename ...Args>
