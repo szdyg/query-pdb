@@ -15,15 +15,11 @@ downloader::downloader(std::string save_path, std::string msdl_server)
         spdlog::error("invalid downloader, path: {}, server: {}", save_path_, msdl_server_);
         return;
     }
-    if (msdl_server_.back() != '/') {
-        msdl_server_.push_back('/');
-    }
 
-    server_split_ = split_server_name();
-    if (server_split_.first.empty()) {
-        spdlog::error("split server name failed, server: {}", msdl_server_);
-        return;
+    if (msdl_server_.back() == '/') {
+        msdl_server_.pop_back();
     }
+    spdlog::info("save path: {}, server: {}", save_path_, msdl_server_);
 }
 
 bool downloader::download(const std::string &name, const std::string &guid) {
@@ -57,13 +53,16 @@ bool downloader::download_impl(const std::string &relative_path) {
     std::unique_lock<std::shared_mutex> lck(mutex_);
     auto path = std::filesystem::path(save_path_).append(relative_path);
     std::filesystem::create_directories(path.parent_path());
-    httplib::Client client(server_split_.first);
+    httplib::Client client(msdl_server_);
     client.set_follow_location(true);
-    auto res = client.Get(server_split_.second + relative_path);
-    if (res.error() != httplib::Error::Success ||
-        !res ||
-        res->status != 200) {
-        spdlog::error("failed to download pdb, path: {}", relative_path);
+    std::string res_url = "/download/symbols/" + relative_path;
+    auto res = client.Get(res_url);
+    if (res.error() != httplib::Error::Success) {
+        spdlog::error("failed to download pdb, path: {} error: {}", res_url,to_string(res.error()));
+        return false;
+    }
+    if (res->status != 200) {
+        spdlog::error("failed to download pdb, path: {} http: {}", res_url,res->status);
         return false;
     }
 
@@ -99,15 +98,4 @@ bool downloader::download_cache(const std::string &path) {
         return true;
     }
     return false;
-}
-
-std::pair<std::string, std::string> downloader::split_server_name() {
-    std::regex regex(R"(^((?:(?:http|https):\/\/)?[^\/]+)(\/.*)$)");
-    std::smatch match;
-
-    if (!std::regex_match(msdl_server_, match, regex)) {
-        return {};
-    }
-
-    return {match[1].str(), match[2].str()};
 }
