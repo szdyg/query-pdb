@@ -10,6 +10,7 @@
 #include <PDB_InfoStream.h>
 #include <PDB_DBIStream.h>
 #include <PDB_TPIStream.h>
+#include "ExampleTypeTable.h"
 #include "handle_guard.h"
 
 struct field_info {
@@ -59,7 +60,7 @@ private:
 
     static std::map<std::string, field_info>
     get_struct_single(
-            const PDB::TPIStream &tpi_stream,
+            const TypeTable &type_table,
             const PDB::CodeView::TPI::Record *record
     );
 
@@ -73,15 +74,14 @@ private:
 
     static std::map<std::string, int64_t>
     get_enum_single(
-            const PDB::CodeView::TPI::Record *record,
-            uint8_t underlying_type_size
+            const PDB::CodeView::TPI::Record *record
     );
 
     template<typename F, typename ...Args>
     auto call_with_pdb_stream(F f, Args &&...args) const {
         // sanity check
         if (!file_.get().baseAddress ||
-            PDB::ValidateFile(file_.get().baseAddress) != PDB::ErrorCode::Success) {
+            PDB::ValidateFile(file_.get().baseAddress, file_.get().len) != PDB::ErrorCode::Success) {
             throw std::runtime_error("invalid PDB file");
         }
 

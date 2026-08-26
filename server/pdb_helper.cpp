@@ -1,3 +1,5 @@
+#include <cstdint>
+#include <cstdio>
 #include "pdb_helper.h"
 
 uint8_t GetLeafSize(PDB::CodeView::TPI::TypeRecordKind kind)
@@ -39,7 +41,7 @@ const char* GetLeafName(const char* data, PDB::CodeView::TPI::TypeRecordKind kin
 }
 
 
-const char* GetTypeName(const PDB::TPIStream& tpiStream, uint32_t typeIndex, uint8_t& pointerLevel, const PDB::CodeView::TPI::Record** referencedType, const PDB::CodeView::TPI::Record** modifierRecord)
+const char* GetTypeName(const TypeTable& typeTable, uint32_t typeIndex, uint8_t& pointerLevel, const PDB::CodeView::TPI::Record** referencedType, const PDB::CodeView::TPI::Record** modifierRecord)
 {
     const char* typeName = nullptr;
     const PDB::CodeView::TPI::Record* underlyingType = nullptr;
@@ -50,7 +52,7 @@ const char* GetTypeName(const PDB::TPIStream& tpiStream, uint32_t typeIndex, uin
     if (modifierRecord)
         *modifierRecord = nullptr;
 
-    auto typeIndexBegin = tpiStream.GetFirstTypeIndex();
+    auto typeIndexBegin = typeTable.GetFirstTypeIndex();
     if (typeIndex < typeIndexBegin)
     {
         auto type = static_cast<PDB::CodeView::TPI::TypeIndexKind>(typeIndex);
@@ -160,7 +162,7 @@ const char* GetTypeName(const PDB::TPIStream& tpiStream, uint32_t typeIndex, uin
     }
     else
     {
-        auto typeRecord = tpiStream.GetTypeRecord(typeIndex);
+        auto typeRecord = typeTable.GetTypeRecord(typeIndex);
         if (!typeRecord)
             return nullptr;
 
@@ -169,29 +171,29 @@ const char* GetTypeName(const PDB::TPIStream& tpiStream, uint32_t typeIndex, uin
             case PDB::CodeView::TPI::TypeRecordKind::LF_MODIFIER:
                 if(modifierRecord)
                     *modifierRecord = typeRecord;
-                return GetTypeName(tpiStream, typeRecord->data.LF_MODIFIER.type, pointerLevel, nullptr, nullptr);
+                return GetTypeName(typeTable, typeRecord->data.LF_MODIFIER.type, pointerLevel, nullptr, nullptr);
             case PDB::CodeView::TPI::TypeRecordKind::LF_POINTER:
                 ++pointerLevel;
                 if(referencedType)
                     *referencedType = typeRecord;
                 if (typeRecord->data.LF_POINTER.utype >= typeIndexBegin)
                 {
-                    underlyingType = tpiStream.GetTypeRecord(typeRecord->data.LF_POINTER.utype);
+                    underlyingType = typeTable.GetTypeRecord(typeRecord->data.LF_POINTER.utype);
                     if (!underlyingType)
                         return nullptr;
 
                     if(underlyingType->header.kind == PDB::CodeView::TPI::TypeRecordKind::LF_POINTER)
-                        return GetTypeName(tpiStream, typeRecord->data.LF_POINTER.utype, pointerLevel, referencedType, modifierRecord);
+                        return GetTypeName(typeTable, typeRecord->data.LF_POINTER.utype, pointerLevel, referencedType, modifierRecord);
                 }
 
-                return GetTypeName(tpiStream, typeRecord->data.LF_POINTER.utype, pointerLevel, &typeRecord, modifierRecord);
+                return GetTypeName(typeTable, typeRecord->data.LF_POINTER.utype, pointerLevel, &typeRecord, modifierRecord);
             case PDB::CodeView::TPI::TypeRecordKind::LF_PROCEDURE:
                 *referencedType = typeRecord;
                 return nullptr;
             case PDB::CodeView::TPI::TypeRecordKind::LF_BITFIELD:
                 if (typeRecord->data.LF_BITFIELD.type < typeIndexBegin)
                 {
-                    typeName = GetTypeName(tpiStream, typeRecord->data.LF_BITFIELD.type, pointerLevel, nullptr, modifierRecord);
+                    typeName = GetTypeName(typeTable, typeRecord->data.LF_BITFIELD.type, pointerLevel, nullptr, modifierRecord);
                     *referencedType = typeRecord;
                     return typeName;
                 }
@@ -202,7 +204,7 @@ const char* GetTypeName(const PDB::TPIStream& tpiStream, uint32_t typeIndex, uin
                 }
             case PDB::CodeView::TPI::TypeRecordKind::LF_ARRAY:
                 *referencedType = typeRecord;
-                return GetTypeName(tpiStream, typeRecord->data.LF_ARRAY.elemtype, pointerLevel, &typeRecord, modifierRecord);
+                return GetTypeName(typeTable, typeRecord->data.LF_ARRAY.elemtype, pointerLevel, &typeRecord, modifierRecord);
             case PDB::CodeView::TPI::TypeRecordKind::LF_CLASS:
             case PDB::CodeView::TPI::TypeRecordKind::LF_STRUCTURE:
                 return GetLeafName(typeRecord->data.LF_CLASS.data, typeRecord->header.kind);

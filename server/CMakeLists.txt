@@ -5,6 +5,7 @@ add_executable(
         pdb_parser.cpp
         pdb_helper.cpp
         ExampleMemoryMappedFile.cpp
+        ExampleTypeTable.cpp
 )
 
 set_target_properties(

@@ -6,10 +6,11 @@
 #include <PDB_RawFile.h>
 #include <PDB_DBIStream.h>
 #include <PDB_TPIStream.h>
+#include "ExampleTypeTable.h"
 
 uint8_t GetLeafSize(PDB::CodeView::TPI::TypeRecordKind kind);
 const char* GetLeafName(const char* data, PDB::CodeView::TPI::TypeRecordKind kind);
-const char* GetTypeName(const PDB::TPIStream& tpiStream, uint32_t typeIndex, uint8_t& pointerLevel, const PDB::CodeView::TPI::Record** referencedType, const PDB::CodeView::TPI::Record** modifierRecord);
+const char* GetTypeName(const TypeTable& typeTable, uint32_t typeIndex, uint8_t& pointerLevel, const PDB::CodeView::TPI::Record** referencedType, const PDB::CodeView::TPI::Record** modifierRecord);
 const char* GetMethodName(const PDB::CodeView::TPI::FieldList* fieldRecord);
 
 #endif //QUERY_PDB_PDB_HELPER_H

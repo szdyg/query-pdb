@@ -1,6 +1,45 @@
+#include <cstring>
 #include <spdlog/spdlog.h>
 #include "pdb_helper.h"
 #include "pdb_parser.h"
+
+namespace {
+
+// CodeView stores a value either inline as a 16 bit unsigned integer (when it is
+// smaller than LF_NUMERIC), or as a numeric leaf: a 2 byte kind tag followed by a
+// payload whose width and signedness are determined by that tag.
+int64_t read_numeric_leaf(const char *data, PDB::CodeView::TPI::TypeRecordKind kind) {
+    using PDB::CodeView::TPI::TypeRecordKind;
+
+    if (kind < TypeRecordKind::LF_NUMERIC) {
+        return *reinterpret_cast<const uint16_t *>(data);
+    }
+
+    const char *payload = data + sizeof(TypeRecordKind);
+    switch (kind) {
+        // note: LF_CHAR and LF_NUMERIC share the value 0x8000
+        case TypeRecordKind::LF_CHAR:
+            return *reinterpret_cast<const int8_t *>(payload);
+        case TypeRecordKind::LF_SHORT:
+            return *reinterpret_cast<const int16_t *>(payload);
+        case TypeRecordKind::LF_USHORT:
+            return *reinterpret_cast<const uint16_t *>(payload);
+        case TypeRecordKind::LF_LONG:
+            return *reinterpret_cast<const int32_t *>(payload);
+        case TypeRecordKind::LF_ULONG:
+            return *reinterpret_cast<const uint32_t *>(payload);
+        case TypeRecordKind::LF_QUADWORD:
+            return *reinterpret_cast<const int64_t *>(payload);
+        case TypeRecordKind::LF_UQUADWORD:
+            return static_cast<int64_t>(*reinterpret_cast<const uint64_t *>(payload));
+        default:
+            spdlog::warn("unsupported numeric leaf 0x{:04x}",
+                         static_cast<unsigned int>(kind));
+            return -1;
+    }
+}
+
+}
 
 pdb_parser::pdb_parser(const std::string &filename)
         : file_(MemoryMappedFile::Open(filename.c_str())) {}
@@ -219,12 +258,16 @@ pdb_parser::get_struct_impl(const PDB::RawFile &raw_file,
         const std::set<std::string> &names) {
     std::map<std::string, std::map<std::string, field_info>> result;
 
-    for (const auto &record: tpi_stream.GetTypeRecords()) {
+    // the tpi stream is walked lazily, the type table builds the index -> record
+    // lookup that resolving field types needs
+    const TypeTable type_table(tpi_stream);
+
+    for (const auto &record: type_table.GetTypeRecords()) {
         if (record->header.kind == PDB::CodeView::TPI::TypeRecordKind::LF_STRUCTURE) {
             if (record->data.LF_CLASS.property.fwdref)
                 continue;
 
-            auto type_record = tpi_stream.GetTypeRecord(record->data.LF_CLASS.field);
+            auto type_record = type_table.GetTypeRecord(record->data.LF_CLASS.field);
             if (!type_record)
                 continue;
 
@@ -233,14 +276,14 @@ pdb_parser::get_struct_impl(const PDB::RawFile &raw_file,
 
             if (auto it = names.find(leaf_name); it != names.end()) {
                 std::map<std::string, field_info> fields =
-                        get_struct_single(tpi_stream, type_record);
+                        get_struct_single(type_table, type_record);
                 result.insert({leaf_name, fields});
             }
         } else if (record->header.kind == PDB::CodeView::TPI::TypeRecordKind::LF_UNION) {
             if (record->data.LF_UNION.property.fwdref)
                 continue;
 
-            auto type_record = tpi_stream.GetTypeRecord(record->data.LF_UNION.field);
+            auto type_record = type_table.GetTypeRecord(record->data.LF_UNION.field);
             if (!type_record)
                 continue;
 
@@ -249,7 +292,7 @@ pdb_parser::get_struct_impl(const PDB::RawFile &raw_file,
 
             if (auto it = names.find(leaf_name); it != names.end()) {
                 std::map<std::string, field_info> fields =
-                        get_struct_single(tpi_stream, type_record);
+                        get_struct_single(type_table, type_record);
                 result.insert({leaf_name, fields});
             }
         }
@@ -260,7 +303,7 @@ pdb_parser::get_struct_impl(const PDB::RawFile &raw_file,
 
 std::map<std::string, field_info>
 pdb_parser::get_struct_single(
-        const PDB::TPIStream &tpi_stream,
+        const TypeTable &type_table,
         const PDB::CodeView::TPI::Record *record
 ) {
     std::map<std::string, field_info> result;
@@ -303,7 +346,7 @@ pdb_parser::get_struct_single(
 
             leaf_name = GetLeafName(field_record->data.LF_MEMBER.offset,
                                     field_record->data.LF_MEMBER.lfEasy.kind);
-            type_name = GetTypeName(tpi_stream, field_record->data.LF_MEMBER.index,
+            type_name = GetTypeName(type_table, field_record->data.LF_MEMBER.index,
                                     pointer_level, &referenced_type,
                                     &modifier_record);
 
@@ -357,21 +400,20 @@ pdb_parser::get_enum_impl(
 ) {
     std::map<std::string, std::map<std::string, int64_t>> result;
 
-    for (const auto &record: tpi_stream.GetTypeRecords()) {
+    const TypeTable type_table(tpi_stream);
+
+    for (const auto &record: type_table.GetTypeRecords()) {
         if (record->header.kind == PDB::CodeView::TPI::TypeRecordKind::LF_ENUM) {
             if (record->data.LF_ENUM.property.fwdref)
                 continue;
 
-            auto type_record = tpi_stream.GetTypeRecord(record->data.LF_ENUM.field);
+            auto type_record = type_table.GetTypeRecord(record->data.LF_ENUM.field);
             if (!type_record)
                 continue;
 
             auto leaf_name = record->data.LF_ENUM.name;
             if (auto it = names.find(leaf_name); it != names.end()) {
-                std::map<std::string, int64_t> fields =
-                        get_enum_single(type_record, GetLeafSize(
-                                static_cast<PDB::CodeView::TPI::TypeRecordKind>(
-                                        record->data.LF_ENUM.utype)));
+                std::map<std::string, int64_t> fields = get_enum_single(type_record);
                 result.insert({leaf_name, fields});
             }
         }
@@ -381,14 +423,8 @@ pdb_parser::get_enum_impl(
 }
 
 std::map<std::string, int64_t>
-pdb_parser::get_enum_single(
-        const PDB::CodeView::TPI::Record *record,
-        uint8_t underlying_type_size) {
+pdb_parser::get_enum_single(const PDB::CodeView::TPI::Record *record) {
     std::map<std::string, int64_t> result;
-
-    const char *leaf_name = nullptr;
-    uint64_t value = 0;
-    const char *value_ptr = nullptr;
 
     auto maximum_size = record->header.size - sizeof(uint16_t);
 
@@ -396,48 +432,19 @@ pdb_parser::get_enum_single(
         auto field_record = reinterpret_cast<const PDB::CodeView::TPI::FieldList *>(
                 reinterpret_cast<const uint8_t *>(&record->data.LF_FIELD.list) + i);
 
-        leaf_name = GetLeafName(field_record->data.LF_ENUMERATE.value,
-                                static_cast<PDB::CodeView::TPI::TypeRecordKind>(0u));
+        // the value is stored before the name, and both its width and the offset
+        // of the name that follows it depend on this kind tag
+        auto kind = field_record->data.LF_ENUMERATE.lfEasy.kind;
 
-        if (field_record->data.LF_ENUMERATE.lfEasy.kind <
-            PDB::CodeView::TPI::TypeRecordKind::LF_NUMERIC)
-            value_ptr = &field_record->data.LF_ENUMERATE.value[0];
-        else
-            value_ptr = &field_record->data.LF_ENUMERATE.value[
-                    sizeof(PDB::CodeView::TPI::TypeRecordKind)];
-
-        switch (underlying_type_size) {
-            case 1:
-                value = *reinterpret_cast<const uint8_t *>(
-                        &field_record->data.LF_ENUMERATE.value[0]);
-                break;
-            case 2:
-                value = *reinterpret_cast<const uint16_t *>(
-                        &field_record->data.LF_ENUMERATE.value[0]);
-                break;
-            case 4:
-                value = *reinterpret_cast<const uint32_t *>(
-                        &field_record->data.LF_ENUMERATE.value[0]);
-                break;
-            case 8:
-                value = *reinterpret_cast<const uint64_t *>(
-                        &field_record->data.LF_ENUMERATE.value[0]);
-                break;
-            default:
-                break;
-        }
-
+        int64_t value = read_numeric_leaf(field_record->data.LF_ENUMERATE.value, kind);
+        const char *leaf_name = GetLeafName(field_record->data.LF_ENUMERATE.value, kind);
 
         result.insert({leaf_name, value});
-
 
         i += static_cast<size_t>(leaf_name - reinterpret_cast<const char *>(field_record));
         i += strnlen(leaf_name, maximum_size - i - 1) + 1;
         i = (i + (sizeof(uint32_t) - 1)) & (0 - sizeof(uint32_t));
-
-        (void) value_ptr;
     }
-
 
     return result;
 }
