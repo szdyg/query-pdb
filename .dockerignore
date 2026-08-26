@@ -1,0 +1,12 @@
+# the build context is copied into the builder stage, keep it to what cmake needs
+.git
+.github
+.gitignore
+.idea
+build
+cmake-build-*
+rsrc
+Dockerfile
+docker-compose.yml
+README.md
+CLAUDE.md
