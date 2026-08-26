@@ -170,17 +170,21 @@ int main(int argc, char *argv[]) {
         // parse pdb
         pdb_parser parser(storage.get_path(pdb, guid).string());
 
-        std::map<std::string, std::map<std::string, field_info> > result =parser.get_struct(query_data);
+        std::map<std::string, std::map<std::string, field_info> > result = parser.get_struct(query_data);
 
-        std::map<std::string, std::map<std::string, std::map<std::string, int64_t> > > translate;
+        nlohmann::json translate = nlohmann::json::object();
         for (const auto &[struct_name, fields]: result) {
-            translate[struct_name] = {};
+            translate[struct_name] = nlohmann::json::object();
             for (const auto &[field_name, field]: fields) {
-                translate[struct_name][field_name] = field.to_map();
+                translate[struct_name][field_name] = {
+                        {"offset",          field.offset},
+                        {"type",            field.type},
+                        {"bitfield_offset", field.bitfield_offset},
+                };
             }
         }
 
-        set_result(res, nlohmann::json(translate).dump());
+        set_result(res, translate.dump());
     });
 
     server.Get("/enum", [&storage](const httplib::Request &req, httplib::Response &res) {

@@ -350,9 +350,14 @@ pdb_parser::get_struct_single(
                                     pointer_level, &referenced_type,
                                     &modifier_record);
 
-
                 field_info info{};
                 info.offset = offset;
+                // GetTypeName returns the pointee's name and reports the
+                // indirection separately, and it may return nullptr
+                if (type_name) {
+                    info.type = type_name;
+                    info.type.append(pointer_level, '*');
+                }
                 if (referenced_type &&
                     referenced_type->header.kind ==
                     PDB::CodeView::TPI::TypeRecordKind::LF_BITFIELD) {

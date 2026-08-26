@@ -16,15 +16,10 @@
 struct field_info {
     int64_t offset;
     int64_t bitfield_offset;
+    // type name with a '*' appended per pointer level, empty if unknown
+    std::string type;
 
     field_info() : offset(-1), bitfield_offset(0) {}
-
-    std::map<std::string, int64_t> to_map() const {
-        return {
-                {"offset",          offset},
-                {"bitfield_offset", bitfield_offset}
-        };
-    }
 };
 
 class pdb_parser {
