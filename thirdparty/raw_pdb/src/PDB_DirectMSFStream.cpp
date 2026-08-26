@@ -6,9 +6,6 @@
 #include "Foundation/PDB_PointerUtil.h"
 #include "Foundation/PDB_BitUtil.h"
 #include "Foundation/PDB_Assert.h"
-#include "Foundation/PDB_DisableWarningsPush.h"
-#include <cstring>
-#include "Foundation/PDB_DisableWarningsPop.h"
 
 
 // ------------------------------------------------------------------------------------------------
@@ -40,6 +37,7 @@ PDB::DirectMSFStream::DirectMSFStream(const void* data, uint32_t blockSize, cons
 // ------------------------------------------------------------------------------------------------
 void PDB::DirectMSFStream::ReadAtOffset(void* destination, size_t size, size_t offset) const PDB_NO_EXCEPT
 {
+	PDB_ASSERT(destination != nullptr, "Destination buffer not set");
 	PDB_ASSERT(offset + size <= m_size, "Not enough data left to read.");
 
 	// work out which block and offset within the block the read offset corresponds to
@@ -54,7 +52,7 @@ void PDB::DirectMSFStream::ReadAtOffset(void* destination, size_t size, size_t o
 	{
 		// fast path, all the data can be read in one go
 		const void* const sourceData = Pointer::Offset<const void*>(m_data, offsetWithinData);
-		std::memcpy(destination, sourceData, size);
+		memcpy(destination, sourceData, size);
 	}
 	else
 	{
@@ -62,7 +60,7 @@ void PDB::DirectMSFStream::ReadAtOffset(void* destination, size_t size, size_t o
 		// read remaining bytes in current block first.
 		{
 			const void* const sourceData = Pointer::Offset<const void*>(m_data, offsetWithinData);
-			std::memcpy(destination, sourceData, bytesLeftInBlock);
+			memcpy(destination, sourceData, bytesLeftInBlock);
 		}
 
 		// read remaining bytes from blocks
@@ -79,13 +77,13 @@ void PDB::DirectMSFStream::ReadAtOffset(void* destination, size_t size, size_t o
 			if (bytesLeftToRead > m_blockSize)
 			{
 				// copy a whole block at once
-				std::memcpy(destinationData, sourceData, m_blockSize);
+				memcpy(destinationData, sourceData, m_blockSize);
 				bytesLeftToRead -= m_blockSize;
 			}
 			else
 			{
 				// copy remaining bytes
-				std::memcpy(destinationData, sourceData, bytesLeftToRead);
+				memcpy(destinationData, sourceData, bytesLeftToRead);
 				bytesLeftToRead -= bytesLeftToRead;
 			}
 		}
@@ -110,7 +108,7 @@ PDB_NO_DISCARD PDB::DirectMSFStream::IndexAndOffset PDB::DirectMSFStream::GetBlo
 PDB_NO_DISCARD size_t PDB::DirectMSFStream::GetDataOffsetForIndexAndOffset(const IndexAndOffset& indexAndOffset) const PDB_NO_EXCEPT
 {
 	// work out the offset within the data based on the block indices
-	const size_t offsetWithinData = (m_blockIndices[indexAndOffset.index] << m_blockSizeLog2) + indexAndOffset.offsetWithinBlock;
+	const size_t offsetWithinData = (static_cast<size_t>(m_blockIndices[indexAndOffset.index]) << m_blockSizeLog2) + indexAndOffset.offsetWithinBlock;
 
 	return offsetWithinData;
 }

@@ -3,16 +3,21 @@ project(Examples)
 set(SOURCES
 	ExampleContributions.cpp
 	ExampleFunctionSymbols.cpp
+	ExampleFunctionVariables.cpp
+	ExampleIPI.cpp
 	ExampleLines.cpp
 	ExampleMain.cpp
 	ExampleMemoryMappedFile.cpp
 	ExampleMemoryMappedFile.h
+	ExamplePDBSize.cpp
 	Examples_PCH.cpp
 	Examples_PCH.h
 	ExampleSymbols.cpp
-	ExampleTypes.cpp
 	ExampleTimedScope.cpp
 	ExampleTimedScope.h
+	ExampleTypes.cpp
+	ExampleTypeTable.cpp
+	ExampleTypeTable.h
 )
 
 source_group(src FILES

@@ -8,6 +8,7 @@
 #include "PDB_InfoStream.h"
 #include "PDB_DBIStream.h"
 #include "PDB_TPIStream.h"
+#include "PDB_IPIStream.h"
 #include "PDB_NamesStream.h"
 
 namespace
@@ -39,6 +40,10 @@ namespace
 				printf("Invalid stream index\n");
 				return true;
 
+			case PDB::ErrorCode::InvalidDataSize:
+				printf("Invalid data size\n");
+				return true;
+
 			case PDB::ErrorCode::UnknownVersion:
 				printf("Unknown version\n");
 				return true;
@@ -51,11 +56,11 @@ namespace
 	PDB_NO_DISCARD static bool HasValidDBIStreams(const PDB::RawFile& rawPdbFile, const PDB::DBIStream& dbiStream)
 	{
 		// check whether the DBI stream offers all sub-streams we need
-		if (IsError(dbiStream.HasValidImageSectionStream(rawPdbFile)))
+		if (IsError(dbiStream.HasValidSymbolRecordStream(rawPdbFile)))
 		{
 			return false;
 		}
-		
+
 		if (IsError(dbiStream.HasValidPublicSymbolStream(rawPdbFile)))
 		{
 			return false;
@@ -71,23 +76,32 @@ namespace
 			return false;
 		}
 
+		if (IsError(dbiStream.HasValidImageSectionStream(rawPdbFile)))
+		{
+			return false;
+		}
+
 		return true;
 	}
 }
 
 
 // declare all examples
-extern void ExampleSymbols(const PDB::RawFile&, const PDB::DBIStream&);
+extern void ExamplePDBSize(const PDB::RawFile&, const PDB::DBIStream&);
+extern void ExampleTPISize(const PDB::TPIStream& tpiStream, const char* outPath);
 extern void ExampleContributions(const PDB::RawFile&, const PDB::DBIStream&);
+extern void ExampleSymbols(const PDB::RawFile&, const PDB::DBIStream&);
 extern void ExampleFunctionSymbols(const PDB::RawFile&, const PDB::DBIStream&);
+extern void ExampleFunctionVariables(const PDB::RawFile& rawPdbFile, const PDB::DBIStream& dbiStream, const PDB::TPIStream&);
 extern void ExampleLines(const PDB::RawFile& rawPdbFile, const PDB::DBIStream& dbiStream, const PDB::InfoStream& infoStream);
 extern void ExampleTypes(const PDB::TPIStream&);
+extern void ExampleIPI(const PDB::RawFile& rawPdbFile, const PDB::InfoStream& infoStream, const PDB::TPIStream& tpiStream, const PDB::IPIStream& ipiStream);
 
 int main(int argc, char** argv)
 {
 	if (argc != 2)
 	{
-		printf("Usage: Examples <PDB path>\nError: Incorrect usage");
+		printf("Usage: Examples <PDB path>\nError: Incorrect usage\n");
 
 		return 1;
 	}
@@ -103,7 +117,7 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
-	if (IsError(PDB::ValidateFile(pdbFile.baseAddress)))
+	if (IsError(PDB::ValidateFile(pdbFile.baseAddress, pdbFile.len)))
 	{
 		MemoryMappedFile::Close(pdbFile);
 
@@ -142,20 +156,43 @@ int main(int argc, char** argv)
 		return 5;
 	}
 
-	const PDB::TPIStream tpiStream = PDB::CreateTPIStream(rawPdbFile);
-	if (PDB::HasValidTPIStream(rawPdbFile) != PDB::ErrorCode::Success)
+	if (IsError(PDB::HasValidTPIStream(rawPdbFile)))
 	{
 		MemoryMappedFile::Close(pdbFile);
 
 		return 5;
 	}
+	const PDB::TPIStream tpiStream = PDB::CreateTPIStream(rawPdbFile);
+
+	PDB::IPIStream ipiStream;
+
+	// It's perfectly possible that an old PDB does not have an IPI stream.
+	if(infoStream.HasIPIStream())
+	{
+		PDB::ErrorCode error = PDB::HasValidIPIStream(rawPdbFile);
+
+		if (error != PDB::ErrorCode::InvalidStream && IsError(error))
+		{
+			MemoryMappedFile::Close(pdbFile);
+
+			return 5;
+		}
+
+		ipiStream = PDB::CreateIPIStream(rawPdbFile);
+	}	
+
 
 	// run all examples
+	ExamplePDBSize(rawPdbFile, dbiStream);
 	ExampleContributions(rawPdbFile, dbiStream);
 	ExampleSymbols(rawPdbFile, dbiStream);
 	ExampleFunctionSymbols(rawPdbFile, dbiStream);
+	ExampleFunctionVariables(rawPdbFile, dbiStream, tpiStream);
 	ExampleLines(rawPdbFile, dbiStream, infoStream);
 	ExampleTypes(tpiStream);
+	ExampleIPI(rawPdbFile, infoStream, tpiStream, ipiStream);
+	// uncomment to dump type sizes to a CSV
+	// ExampleTPISize(tpiStream, "output.csv");
 
 	MemoryMappedFile::Close(pdbFile);
 

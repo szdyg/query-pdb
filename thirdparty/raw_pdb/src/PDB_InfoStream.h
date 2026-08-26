@@ -29,14 +29,23 @@ namespace PDB
 			return m_header;
 		}
 
+		// Returns whether the module has a names stream.
+		PDB_NO_DISCARD inline bool HasNamesStream(void) const PDB_NO_EXCEPT
+		{
+			return (m_namesStreamIndex != 0u);
+		}
+
 		// Returns whether the PDB file was linked using /DEBUG:FASTLINK.
 		PDB_NO_DISCARD inline bool UsesDebugFastLink(void) const PDB_NO_EXCEPT
 		{
 			return m_usesDebugFastlink;
 		}
 
-		// Returns whether the module has a names stream.
-		PDB_NO_DISCARD bool HasNamesStream(void) const PDB_NO_EXCEPT;
+		// Returns whether the PDB file has an IPI stream.
+		PDB_NO_DISCARD inline bool HasIPIStream(void) const PDB_NO_EXCEPT
+		{
+			return m_hasIPIStream;
+		}
 
 		// Create names stream
 		PDB_NO_DISCARD NamesStream CreateNamesStream(const RawFile& file) const PDB_NO_EXCEPT;
@@ -46,6 +55,7 @@ namespace PDB
 		const Header* m_header;
 		uint32_t m_namesStreamIndex;
 		bool m_usesDebugFastlink;
+		bool m_hasIPIStream;
 
 		PDB_DISABLE_COPY(InfoStream);
 	};

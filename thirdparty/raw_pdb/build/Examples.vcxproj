@@ -13,9 +13,12 @@
   <ItemGroup>
     <ClCompile Include="..\src\Examples\ExampleContributions.cpp" />
     <ClCompile Include="..\src\Examples\ExampleFunctionSymbols.cpp" />
+    <ClCompile Include="..\src\Examples\ExampleFunctionVariables.cpp" />
+    <ClCompile Include="..\src\Examples\ExampleIPI.cpp" />
     <ClCompile Include="..\src\Examples\ExampleLines.cpp" />
     <ClCompile Include="..\src\Examples\ExampleMain.cpp" />
     <ClCompile Include="..\src\Examples\ExampleMemoryMappedFile.cpp" />
+    <ClCompile Include="..\src\Examples\ExamplePDBSize.cpp" />
     <ClCompile Include="..\src\Examples\ExampleSymbols.cpp" />
     <ClCompile Include="..\src\Examples\Examples_PCH.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
@@ -25,11 +28,13 @@
     </ClCompile>
     <ClCompile Include="..\src\Examples\ExampleTimedScope.cpp" />
     <ClCompile Include="..\src\Examples\ExampleTypes.cpp" />
+    <ClCompile Include="..\src\Examples\ExampleTypeTable.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\Examples\ExampleMemoryMappedFile.h" />
     <ClInclude Include="..\src\Examples\Examples_PCH.h" />
     <ClInclude Include="..\src\Examples\ExampleTimedScope.h" />
+    <ClInclude Include="..\src\Examples\ExampleTypeTable.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
@@ -94,7 +99,7 @@
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <AdditionalIncludeDirectories>..\src</AdditionalIncludeDirectories>
       <SmallerTypeCheck>true</SmallerTypeCheck>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp14</LanguageStandard>
       <AdditionalOptions>/Gw /Zc:__cplusplus /wd4577 %(AdditionalOptions)</AdditionalOptions>
       <SDLCheck>true</SDLCheck>
       <StringPooling>false</StringPooling>
@@ -138,7 +143,7 @@
       <TreatWarningAsError>true</TreatWarningAsError>
       <EnforceTypeConversionRules>true</EnforceTypeConversionRules>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp14</LanguageStandard>
       <SDLCheck>false</SDLCheck>
       <GuardEHContMetadata>false</GuardEHContMetadata>
       <ConformanceMode>true</ConformanceMode>

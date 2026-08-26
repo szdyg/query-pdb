@@ -62,17 +62,17 @@ namespace
 
 	// ------------------------------------------------------------------------------------------------
 	// ------------------------------------------------------------------------------------------------
-	PDB_NO_DISCARD static inline bool HasDebugHeaderSubstream(const PDB::DBI::StreamHeader& dbiHeader) PDB_NO_EXCEPT
+	PDB_NO_DISCARD static inline uint32_t GetDebugHeaderSubstreamOffset(const PDB::DBI::StreamHeader& dbiHeader) PDB_NO_EXCEPT
 	{
-		return dbiHeader.optionalDebugHeaderSize != 0u;
+		return GetECSubstreamOffset(dbiHeader) + dbiHeader.ecSize;
 	}
 
 
 	// ------------------------------------------------------------------------------------------------
 	// ------------------------------------------------------------------------------------------------
-	PDB_NO_DISCARD static inline uint32_t GetDebugHeaderSubstreamOffset(const PDB::DBI::StreamHeader& dbiHeader) PDB_NO_EXCEPT
+	PDB_NO_DISCARD static inline bool HasDebugHeaderSubstream(const PDB::DBI::StreamHeader& dbiHeader) PDB_NO_EXCEPT
 	{
-		return GetECSubstreamOffset(dbiHeader) + dbiHeader.ecSize;
+		return dbiHeader.optionalDebugHeaderSize != 0u;
 	}
 }
 
@@ -132,6 +132,14 @@ PDB_NO_DISCARD PDB::DBIStream PDB::CreateDBIStream(const RawFile& file) PDB_NO_E
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
+PDB_NO_DISCARD PDB::ErrorCode PDB::DBIStream::HasValidSymbolRecordStream(const RawFile& /* file */) const PDB_NO_EXCEPT
+{
+	return (m_header.symbolRecordStreamIndex != PDB::NilStreamIndex) ? ErrorCode::Success : ErrorCode::InvalidStreamIndex;
+}
+
+
+// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
 PDB_NO_DISCARD PDB::ErrorCode PDB::DBIStream::HasValidImageSectionStream(const RawFile& /* file */) const PDB_NO_EXCEPT
 {
 	// the debug header stream is optional. if it's not there, we can't get the image section stream either.
@@ -142,6 +150,15 @@ PDB_NO_DISCARD PDB::ErrorCode PDB::DBIStream::HasValidImageSectionStream(const R
 
 	// find the debug header sub-stream
 	const uint32_t debugHeaderOffset = GetDebugHeaderSubstreamOffset(m_header);
+
+	// validate that we have enough data to read the debug header
+	// (the header field optionalDebugHeaderSize might claim there's a debug header,
+	// but the stream might not have enough data - this happens with some .ni.pdb files)
+	if (debugHeaderOffset + sizeof(DBI::DebugHeader) > m_stream.GetSize())
+	{
+		return ErrorCode::InvalidStream;
+	}
+
 	const DBI::DebugHeader& debugHeader = m_stream.ReadAtOffset<DBI::DebugHeader>(debugHeaderOffset);
 
 	if (debugHeader.sectionHeaderStreamIndex == DBI::DebugHeader::InvalidStreamIndex)
@@ -157,6 +174,11 @@ PDB_NO_DISCARD PDB::ErrorCode PDB::DBIStream::HasValidImageSectionStream(const R
 // ------------------------------------------------------------------------------------------------
 PDB_NO_DISCARD PDB::ErrorCode PDB::DBIStream::HasValidPublicSymbolStream(const RawFile& file) const PDB_NO_EXCEPT
 {
+	if (m_header.publicStreamIndex == PDB::NilStreamIndex)
+	{
+		return ErrorCode::InvalidStreamIndex;
+	}
+
 	DirectMSFStream publicStream = file.CreateMSFStream<DirectMSFStream>(m_header.publicStreamIndex);
 
 	// the public symbol stream always begins with a header, we are not interested in that.
@@ -179,6 +201,11 @@ PDB_NO_DISCARD PDB::ErrorCode PDB::DBIStream::HasValidPublicSymbolStream(const R
 // ------------------------------------------------------------------------------------------------
 PDB_NO_DISCARD PDB::ErrorCode PDB::DBIStream::HasValidGlobalSymbolStream(const RawFile& file) const PDB_NO_EXCEPT
 {
+	if (m_header.globalStreamIndex == PDB::NilStreamIndex)
+	{
+		return ErrorCode::InvalidStreamIndex;
+	}
+
 	DirectMSFStream globalStream = file.CreateMSFStream<DirectMSFStream>(m_header.globalStreamIndex);
 
 	// the global symbol stream starts with a hash table header
@@ -200,6 +227,11 @@ PDB_NO_DISCARD PDB::ErrorCode PDB::DBIStream::HasValidGlobalSymbolStream(const R
 // ------------------------------------------------------------------------------------------------
 PDB_NO_DISCARD PDB::ErrorCode PDB::DBIStream::HasValidSectionContributionStream(const RawFile& /* file */) const PDB_NO_EXCEPT
 {
+	if (m_header.sectionContributionSize < sizeof(DBI::SectionContribution::Version))
+	{
+		return ErrorCode::InvalidStream;
+	}
+
 	// find the section contribution sub-stream
 	// https://llvm.org/docs/PDB/DbiStream.html#section-contribution-substream
 	const uint32_t streamOffset = GetSectionContributionSubstreamOffset(m_header);

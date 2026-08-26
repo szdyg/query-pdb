@@ -4,10 +4,6 @@
 #include "PDB_PCH.h"
 #include "PDB_ModuleInfoStream.h"
 #include "Foundation/PDB_Memory.h"
-#include "Foundation/PDB_DisableWarningsPush.h"
-#include <cstring>
-#include "Foundation/PDB_DisableWarningsPop.h"
-
 
 namespace
 {
@@ -142,11 +138,11 @@ PDB::ModuleInfoStream::ModuleInfoStream(const DirectMSFStream& directStream, uin
 		streamOffset += sizeof(DBI::ModuleInfo);
 
 		const char* name = m_stream.GetDataAtOffset<const char>(streamOffset);
-		const size_t nameLength = std::strlen(name);
+		const size_t nameLength = strlen(name);
 		streamOffset += nameLength + 1u;
 
 		const char* objectName = m_stream.GetDataAtOffset<const char>(streamOffset);
-		const size_t objectNameLength = std::strlen(objectName);
+		const size_t objectNameLength = strlen(objectName);
 		streamOffset += objectNameLength + 1u;
 
 		// the stream is aligned to 4 bytes
@@ -177,7 +173,7 @@ PDB_NO_DISCARD const PDB::ModuleInfoStream::Module* PDB::ModuleInfoStream::FindL
 		const Module& module = m_modules[count - i - 1u];
 
 		// check if this is the linker symbol
-		if (std::strcmp(module.GetName().Decay(), LinkerSymbolName) == 0)
+		if (strcmp(module.GetName().Decay(), LinkerSymbolName) == 0)
 		{
 			return &module;
 		}

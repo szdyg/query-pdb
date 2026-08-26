@@ -149,6 +149,13 @@ void ExampleFunctionSymbols(const PDB::RawFile& rawPdbFile, const PDB::DBIStream
 		for (const PDB::HashRecord& hashRecord : hashRecords)
 		{
 			const PDB::CodeView::DBI::Record* record = publicSymbolStream.GetRecord(symbolRecordStream, hashRecord);
+			if (record->header.kind != PDB::CodeView::DBI::SymbolRecordKind::S_PUB32)
+			{
+				// normally, a PDB only contains S_PUB32 symbols in the public symbol stream, but we have seen PDBs that also store S_CONSTANT as public symbols.
+				// ignore these.
+				continue;
+			}
+
 			if ((PDB_AS_UNDERLYING(record->data.S_PUB32.flags) & PDB_AS_UNDERLYING(PDB::CodeView::DBI::PublicSymbolFlags::Function)) == 0u)
 			{
 				// ignore everything that is not a function
@@ -218,7 +225,7 @@ void ExampleFunctionSymbols(const PDB::RawFile& rawPdbFile, const PDB::DBIStream
 		// we know have the sizes of all symbols, except the last.
 		// this can be found by going through the contributions, if needed.
 		FunctionSymbol& lastSymbol = functionSymbols[symbolCount - 1u];
-		if (lastSymbol.size != 0u)
+		if (lastSymbol.size == 0u)
 		{
 			// bad luck, we can't deduce the last symbol's size, so have to consult the contributions instead.
 			// we do a linear search in this case to keep the code simple.

@@ -5,7 +5,6 @@
 #include "PDB_InfoStream.h"
 #include "PDB_RawFile.h"
 
-
 namespace
 {
 	// the PDB info stream always resides at index 1
@@ -20,6 +19,7 @@ PDB::InfoStream::InfoStream(void) PDB_NO_EXCEPT
 	, m_header(nullptr)
 	, m_namesStreamIndex(0)
 	, m_usesDebugFastlink(false)
+	, m_hasIPIStream(false)
 {
 }
 
@@ -29,7 +29,9 @@ PDB::InfoStream::InfoStream(void) PDB_NO_EXCEPT
 PDB::InfoStream::InfoStream(const RawFile& file) PDB_NO_EXCEPT
 	: m_stream(file.CreateMSFStream<CoalescedMSFStream>(InfoStreamIndex))
 	, m_header(m_stream.GetDataAtOffset<const Header>(0u))
+	, m_namesStreamIndex(0)
 	, m_usesDebugFastlink(false)
+	, m_hasIPIStream(false)
 {
 	// the info stream starts with the header, followed by the named stream map, followed by the feature codes
 	// https://llvm.org/docs/PDB/PdbStream.html#named-stream-map
@@ -62,7 +64,7 @@ PDB::InfoStream::InfoStream(const RawFile& file) PDB_NO_EXCEPT
 		const NamedStreamMap::HashTableEntry& entry = namedStreamMapHashEntries[i];
 		const char* streamName = &namedStreamMap->stringTable[entry.stringTableOffset];
 
-		if (std::strcmp("/names", streamName) == 0)
+		if (strcmp("/names", streamName) == 0)
 		{
 			m_namesStreamIndex = entry.streamIndex;
 		}
@@ -78,20 +80,22 @@ PDB::InfoStream::InfoStream(const RawFile& file) PDB_NO_EXCEPT
 
 	for (size_t i=0u; i < count; ++i)
 	{
-		if (featureCodes[i] == PDB::FeatureCode::MinimalDebugInfo)
+		FeatureCode code = featureCodes[i];
+		if (code == PDB::FeatureCode::MinimalDebugInfo)
 		{
 			m_usesDebugFastlink = true;
+		}
+		else if (code == PDB::FeatureCode::VC110 || code == PDB::FeatureCode::VC140)
+		{
+			m_hasIPIStream = true;
 		}
 	}
 }
 
-bool PDB::InfoStream::HasNamesStream(void) const PDB_NO_EXCEPT
-{
-	return m_namesStreamIndex != 0;
-}
 
+// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
 PDB::NamesStream PDB::InfoStream::CreateNamesStream(const RawFile& file) const PDB_NO_EXCEPT
 {
 	return NamesStream(file, m_namesStreamIndex);
 }
-

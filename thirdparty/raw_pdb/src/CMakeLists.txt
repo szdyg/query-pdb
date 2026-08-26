@@ -3,8 +3,6 @@ set(SOURCES
 	Foundation/PDB_Assert.h
 	Foundation/PDB_BitOperators.h
 	Foundation/PDB_BitUtil.h
-	Foundation/PDB_DisableWarningsPop.h
-	Foundation/PDB_DisableWarningsPush.h
 	Foundation/PDB_Forward.h
 	Foundation/PDB_Log.h
 	Foundation/PDB_Macros.h
@@ -12,6 +10,7 @@ set(SOURCES
 	Foundation/PDB_Move.h
 	Foundation/PDB_Platform.h
 	Foundation/PDB_PointerUtil.h
+	Foundation/PDB_TypeTraits.h
 	Foundation/PDB_Warnings.h
 	
 	PDB.cpp
@@ -68,6 +67,8 @@ add_library(raw_pdb
     ${SOURCES}
 )
 
+set_target_properties(raw_pdb PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 target_include_directories(raw_pdb
   PUBLIC
     .
@@ -78,4 +79,35 @@ target_precompile_headers(raw_pdb
     PDB_PCH.h
 )
 
-add_subdirectory(Examples)
+option(RAWPDB_BUILD_EXAMPLES "Build Examples" ON)
+
+if (RAWPDB_BUILD_EXAMPLES)
+	add_subdirectory(Examples)
+endif()
+
+if (UNIX)
+	include(GNUInstallDirs)
+
+	install(
+		TARGETS raw_pdb
+		LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+	)
+
+	file(GLOB_RECURSE HEADER_FILES
+		"${CMAKE_CURRENT_SOURCE_DIR}/*.h"
+	)
+
+	file(GLOB_RECURSE HEADER_FILES_FOUNDATION
+		"${CMAKE_CURRENT_SOURCE_DIR}/Foundation/*.h"
+	)
+
+	install(
+		FILES ${HEADER_FILES}
+		DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/raw_pdb/"
+	)
+
+	install(
+		FILES ${HEADER_FILES_FOUNDATION}
+		DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/raw_pdb/Foundation"
+	)
+endif (UNIX)

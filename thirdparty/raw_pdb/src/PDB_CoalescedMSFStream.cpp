@@ -7,9 +7,6 @@
 #include "PDB_DirectMSFStream.h"
 #include "Foundation/PDB_PointerUtil.h"
 #include "Foundation/PDB_Memory.h"
-#include "Foundation/PDB_DisableWarningsPush.h"
-#include <cstring>
-#include "Foundation/PDB_DisableWarningsPop.h"
 
 
 namespace
@@ -112,7 +109,7 @@ PDB::CoalescedMSFStream::CoalescedMSFStream(const void* data, uint32_t blockSize
 			// read one single block at the correct offset in the stream
 			const size_t fileOffset = PDB::ConvertBlockIndexToFileOffset(index, blockSize);
 			const void* sourceData = Pointer::Offset<const void*>(data, fileOffset);
-			std::memcpy(destination, sourceData, blockSize);
+			memcpy(destination, sourceData, blockSize);
 
 			destination += blockSize;
 		}
@@ -126,7 +123,7 @@ PDB::CoalescedMSFStream::CoalescedMSFStream(const void* data, uint32_t blockSize
 			// read remaining bytes at correct offset in the stream
 			const size_t fileOffset = PDB::ConvertBlockIndexToFileOffset(index, blockSize);
 			const void* sourceData = Pointer::Offset<const void*>(data, fileOffset);
-			std::memcpy(destination, sourceData, remainingBytes);
+			memcpy(destination, sourceData, remainingBytes);
 		}
 	}
 }

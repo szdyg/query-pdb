@@ -5,7 +5,6 @@
 
 #include "PDB_Platform.h"
 
-
 #if PDB_COMPILER_MSVC
 	// some warnings were introduced with different versions of Visual Studio, so we disable this warning instead of using a bunch of #if/#endif
 #	pragma warning (disable : 4619)		// there is no warning number N
@@ -40,4 +39,7 @@
 
 	// some structures will have to be padded
 #	pragma clang diagnostic ignored "-Wpadded"
+
+	// it's impossible to write C++ code using raw pointers without triggering this warning
+#	pragma clang diagnostic ignored "-Wunsafe-buffer-usage"
 #endif

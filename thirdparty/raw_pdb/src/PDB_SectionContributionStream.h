@@ -11,7 +11,7 @@
 
 namespace PDB
 {
-	class PDB_NO_DISCARD DirectMSFStream;
+	class DirectMSFStream;
 
 
 	class PDB_NO_DISCARD SectionContributionStream
